@@ -57,25 +57,21 @@ APP.Main = (function() {
      * probably in a requestAnimationFrame callback.
      */
     function onStoryData(key, details) {
+        var storyElement = document.querySelector('#s-' + key);
 
-        // This seems odd. Surely we could just select the story
-        // directly rather than looping through all of them.
-        var storyElements = document.querySelectorAll('.story');
-
-        for (var i = 0; i < storyElements.length; i++) {
-            if (storyElements[i].getAttribute('id') === 's-' + key) {
-
-                details.time *= 1000;
-                var story = storyElements[i];
-                var html = storyTemplate(details);
-                story.innerHTML = html;
-                story.addEventListener('click', onStoryClick.bind(this, details));
-                story.classList.add('clickable');
-
-                // Tick down. When zero we can batch in the next load.
-                storyLoadCount--;
-            }
+        if (!storyElement) {
+            return;
         }
+
+        var html = storyTemplate(details);
+
+        details.time *= 1000;
+        storyElement.innerHTML = html;
+        storyElement.addEventListener('click', onStoryClick.bind(this, details));
+        storyElement.classList.add('clickable');
+
+        // Tick down. When zero we can batch in the next load.
+        storyLoadCount--;
 
         // Colorize on complete.
         if (storyLoadCount === 0) {
@@ -84,109 +80,101 @@ APP.Main = (function() {
     }
 
     function onStoryClick(details) {
-        var storyDetails = $('sd-' + details.id);
+        var storyDetails = $('#story-details');
 
         // Wait a little time then show the story details.
-        setTimeout(showStory.bind(this, details.id), 60);
+        //setTimeout(showStory.bind(this, details.id), 60);
+        requestAnimationFrame(showStory.bind(this));
 
         // Create and append the story. A visual change...
         // perhaps that should be in a requestAnimationFrame?
         // And maybe, since they're all the same, I don't
         // need to make a new element every single time? I mean,
         // it inflates the DOM and I can only see one at once.
-        if (!storyDetails) {
-            if (details.url) {
-                details.urlobj = new URL(details.url);
-            }
 
-            var comment;
-            var commentsElement;
-            var storyHeader;
-            var storyContent;
+        if (details.url) {
+            details.urlobj = new URL(details.url);
+        }
 
-            var storyDetailsHtml = storyDetailsTemplate(details);
-            var kids = details.kids;
-            var commentHtml = storyDetailsCommentTemplate({
-                by: '', text: 'Loading comment...'
-            });
+        var comment;
+        var commentsElement;
+        var storyHeader;
+        var storyContent;
 
-            storyDetails = document.createElement('section');
-            storyDetails.setAttribute('id', 'sd-' + details.id);
-            storyDetails.classList.add('story-details');
-            storyDetails.innerHTML = storyDetailsHtml;
+        var storyDetailsHtml = storyDetailsTemplate(details);
+        var kids = details.kids;
+        var commentHtml = storyDetailsCommentTemplate({
+            by: '', text: 'Loading comment...'
+        });
 
-            document.body.appendChild(storyDetails);
+        storyDetails.innerHTML = storyDetailsHtml;
+        commentsElement = storyDetails.querySelector('.js-comments');
+        storyHeader = storyDetails.querySelector('.js-header');
+        storyContent = storyDetails.querySelector('.js-content');
 
-            commentsElement = storyDetails.querySelector('.js-comments');
-            storyHeader = storyDetails.querySelector('.js-header');
-            storyContent = storyDetails.querySelector('.js-content');
+        var closeButton = storyDetails.querySelector('.js-close');
+        closeButton.addEventListener('click', hideStory.bind(this));
 
-            var closeButton = storyDetails.querySelector('.js-close');
-            closeButton.addEventListener('click', hideStory.bind(this, details.id));
+        var headerHeight = storyHeader.getBoundingClientRect().height;
+        storyContent.style.paddingTop = headerHeight + 'px';
 
-            var headerHeight = storyHeader.getBoundingClientRect().height;
-            storyContent.style.paddingTop = headerHeight + 'px';
+        if (typeof kids === 'undefined') {
+            return;
+        }
 
-            if (typeof kids === 'undefined') {
-                return;
-            }
+        var handleGetStoryComment = function(commentDetails) {
+            commentDetails.time *= 1000;
 
-            var handleGetStoryComment = function(commentDetails) {
-                commentDetails.time *= 1000;
+            var comment = commentsElement.querySelector('#sdc-' + commentDetails.id);
+            comment.innerHTML = storyDetailsCommentTemplate(
+                commentDetails,
+                localeData
+            );
+        };
 
-                var comment = commentsElement.querySelector('#sdc-' + commentDetails.id);
-                comment.innerHTML = storyDetailsCommentTemplate(
-                    commentDetails,
-                    localeData
-                );
-            };
+        for (var k = 0; k < kids.length; k++) {
+            comment = document.createElement('aside');
+            comment.setAttribute('id', 'sdc-' + kids[k]);
+            comment.classList.add('story-details__comment');
+            comment.innerHTML = commentHtml;
+            commentsElement.appendChild(comment);
 
-            for (var k = 0; k < kids.length; k++) {
-                comment = document.createElement('aside');
-                comment.setAttribute('id', 'sdc-' + kids[k]);
-                comment.classList.add('story-details__comment');
-                comment.innerHTML = commentHtml;
-                commentsElement.appendChild(comment);
-
-                // Update the comment with the live data.
-                APP.Data.getStoryComment(kids[k], handleGetStoryComment);
-            }
+            // Update the comment with the live data.
+            APP.Data.getStoryComment(kids[k], handleGetStoryComment);
         }
     }
 
-    function showStory(id) {
+    function showStory() {
         if (inDetails) {
             return;
         }
 
         inDetails = true;
 
-        var storyDetails = $('#sd-' + id);
+        var storyDetails = $('#story-details');
         var left = null;
 
         if (!storyDetails) {
             return;
         }
 
-        document.body.classList.add('details-active');
+        var storyDetailsPositionLeft = storyDetails.getBoundingClientRect().left;
+        main.classList.add('details-active');
         storyDetails.style.opacity = 1;
 
         function animate() {
 
-            // Find out where it currently is.
-            var storyDetailsPosition = storyDetails.getBoundingClientRect();
-
             // Set the left value if we don't have one already.
             if (left === null) {
-                left = storyDetailsPosition.left;
+                left = storyDetailsPositionLeft;
             }
 
             // Now figure out where it needs to go.
-            left += (0 - storyDetailsPosition.left) * 0.1;
+            left += (0 - storyDetailsPositionLeft) * 0.1;
 
             // Set up the next bit of the animation if there is more to do.
             if (Math.abs(left) > 0.5) {
-                setTimeout(animate, 4);
+                requestAnimationFrame(animate);
             } else {
                 left = 0;
             }
@@ -200,32 +188,32 @@ APP.Main = (function() {
         // every few milliseconds. That's going to keep
         // it all tight. Or maybe we're doing visual changes
         // and they should be in a requestAnimationFrame
-        setTimeout(animate, 4);
+        requestAnimationFrame(animate);
     }
 
-    function hideStory(id) {
+    function hideStory() {
         if (!inDetails) {
             return;
         }
 
-        var storyDetails = $('#sd-' + id);
+        var storyDetails = $('#story-details');
         var left = 0;
+        var mainPositionWidth = main.getBoundingClientRect().width;
+        var target = mainPositionWidth + 100;
 
-        document.body.classList.remove('details-active');
+        main.classList.remove('details-active');
         storyDetails.style.opacity = 0;
 
         function animate() {
             // Find out where it currently is.
-            var mainPosition = main.getBoundingClientRect();
             var storyDetailsPosition = storyDetails.getBoundingClientRect();
-            var target = mainPosition.width + 100;
 
             // Now figure out where it needs to go.
             left += (target - storyDetailsPosition.left) * 0.1;
 
             // Set up the next bit of the animation if there is more to do.
             if (Math.abs(left - target) > 0.5) {
-                setTimeout(animate, 4);
+                requestAnimationFrame(animate);
             } else {
                 left = target;
                 inDetails = false;
@@ -240,7 +228,7 @@ APP.Main = (function() {
         // every few milliseconds. That's going to keep
         // it all tight. Or maybe we're doing visual changes
         // and they should be in a requestAnimationFrame
-        setTimeout(animate, 4);
+        requestAnimationFrame(animate);
     }
 
     /**
@@ -249,37 +237,56 @@ APP.Main = (function() {
      */
     function colorizeAndScaleStories() {
         var storyElements = document.querySelectorAll('.story');
+        var documentTop = document.body.getBoundingClientRect().top;
+        var documentBottom = document.body.getBoundingClientRect().bottom;
+        var height = main.offsetHeight;
+        var mainPosition = main.getBoundingClientRect();
+
+        var storyHash = {};
+        var story;
+        var score;
+        var title;
+
+        for (var s = 0; s < storyElements.length; s++) {
+            story = storyElements[s];
+            storyHash[s] = {
+                score: story.querySelector('.story__score'),
+                title: story.querySelector('.story__title')
+            };
+
+            storyHash[s].scoreTop = storyHash[s].score.getBoundingClientRect().top;
+            storyHash[s].scoreWidth = storyHash[s].score.getBoundingClientRect().width;
+
+            if (storyHash[s].scoreTop < documentTop && storyHash[s].scoreTop > documentBottom) {
+                break;
+            }
+        }
 
         // It does seem awfully broad to change all the
         // colors every time!
-        for (var s = 0; s < storyElements.length; s++) {
-            var story = storyElements[s];
-            var score = story.querySelector('.story__score');
-            var title = story.querySelector('.story__title');
+        for (s = 0; s < storyElements.length; s++) {
+            if (storyHash[s].scoreTop < documentTop && storyHash[s].scoreTop > documentBottom) {
+                break;
+            }
 
             // Base the scale on the y position of the score.
-            var height = main.offsetHeight;
-            var mainPosition = main.getBoundingClientRect();
-            var scoreLocation = score.getBoundingClientRect().top -
-                document.body.getBoundingClientRect().top;
+            var scoreLocation = storyHash[s].scoreTop - documentTop;
             var scale = Math.min(1, 1 - (0.05 * ((scoreLocation - 170) / height)));
             var opacity = Math.min(1, 1 - (0.5 * ((scoreLocation - 170) / height)));
 
-            score.style.width = (scale * 40) + 'px';
-            score.style.height = (scale * 40) + 'px';
-            score.style.lineHeight = (scale * 40) + 'px';
-
             // Now figure out how wide it is and use that to saturate it.
-            scoreLocation = score.getBoundingClientRect();
-            var saturation = (100 * ((scoreLocation.width - 38) / 2));
+            var saturation = (100 * ((storyHash[s].score.width - 38) / 2));
 
-            score.style.backgroundColor = 'hsl(42, ' + saturation + '%, 50%)';
-            title.style.opacity = opacity;
+            storyHash[s].score.style.width = (scale * 40) + 'px';
+            storyHash[s].score.style.height = (scale * 40) + 'px';
+            storyHash[s].score.style.lineHeight = (scale * 40) + 'px';
+            storyHash[s].score.style.backgroundColor = 'hsl(42, ' + saturation + '%, 50%)';
+
+            storyHash[s].title.style.opacity = opacity;
         }
     }
 
     main.addEventListener('touchstart', function(evt) {
-
         // I just wanted to test what happens if touchstart
         // gets canceled. Hope it doesn't block scrolling on mobiles...
         if (Math.random() > 0.97) {
@@ -288,9 +295,13 @@ APP.Main = (function() {
     });
 
     main.addEventListener('scroll', function() {
+        var mainScrollTop = main.scrollTop;
+        var mainScrollHeight = main.scrollHeight;
+        var mainOffsetHeight = main.offsetHeight;
+
         var header = $('header');
         var headerTitles = header.querySelector('.header__title-wrapper');
-        var scrollTopCapped = Math.min(70, main.scrollTop);
+        var scrollTopCapped = Math.min(70, mainScrollTop);
         var scaleString = 'scale(' + (1 - (scrollTopCapped / 300)) + ')';
 
         colorizeAndScaleStories();
@@ -299,16 +310,15 @@ APP.Main = (function() {
         headerTitles.style.transform = scaleString;
 
         // Add a shadow to the header.
-        if (main.scrollTop > 70) {
-            document.body.classList.add('raised');
+        if (mainScrollTop > 70) {
+            main.classList.add('raised');
         } else {
-            document.body.classList.remove('raised');
+            main.classList.remove('raised');
         }
 
         // Check if we need to load the next batch of stories.
-        var loadThreshold = (main.scrollHeight - main.offsetHeight -
-            LAZY_LOAD_THRESHOLD);
-        if (main.scrollTop > loadThreshold) {
+        var loadThreshold = (mainScrollHeight - mainOffsetHeight - LAZY_LOAD_THRESHOLD);
+        if (mainScrollTop > loadThreshold) {
             loadStoryBatch();
         }
     });
