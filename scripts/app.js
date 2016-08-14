@@ -248,25 +248,19 @@ APP.Main = (function() {
         var title;
 
         for (var s = 0; s < storyElements.length; s++) {
-            story = storyElements[s];
-            storyHash[s] = {
-                score: story.querySelector('.story__score'),
-                title: story.querySelector('.story__title')
-            };
+            storyHash[s] = {};
 
+            storyHash[s].score = storyElements[s].querySelector('.story__score');
             storyHash[s].scoreTop = storyHash[s].score.getBoundingClientRect().top;
             storyHash[s].scoreWidth = storyHash[s].score.getBoundingClientRect().width;
-
-            if (storyHash[s].scoreTop < documentTop && storyHash[s].scoreTop > documentBottom) {
-                break;
-            }
+            storyHash[s].title = storyElements[s].querySelector('.story__title');
         }
 
         // It does seem awfully broad to change all the
         // colors every time!
         for (s = 0; s < storyElements.length; s++) {
             if (storyHash[s].scoreTop < documentTop && storyHash[s].scoreTop > documentBottom) {
-                break;
+                continue;
             }
 
             // Base the scale on the y position of the score.
@@ -305,9 +299,6 @@ APP.Main = (function() {
         var scaleString = 'scale(' + (1 - (scrollTopCapped / 300)) + ')';
 
         colorizeAndScaleStories();
-        header.style.height = (156 - scrollTopCapped) + 'px';
-        headerTitles.style.webkitTransform = scaleString;
-        headerTitles.style.transform = scaleString;
 
         // Add a shadow to the header.
         if (mainScrollTop > 70) {
@@ -315,6 +306,10 @@ APP.Main = (function() {
         } else {
             main.classList.remove('raised');
         }
+
+        headerTitles.style.webkitTransform = scaleString;
+        headerTitles.style.transform = scaleString;
+        header.style.height = (156 - scrollTopCapped) + 'px';
 
         // Check if we need to load the next batch of stories.
         var loadThreshold = (mainScrollHeight - mainOffsetHeight - LAZY_LOAD_THRESHOLD);
